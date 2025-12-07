@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Happy Birthday Jyothi Mam!</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Fredoka:wght@400;600&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Fredoka', sans-serif;
+            touch-action: none; /* Prevent scrolling on mobile while playing */
+        }
+
+        .cursive-font {
+            font-family: 'Dancing Script', cursive;
+        }
+
+        #game-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none; /* Let clicks pass through to canvas unless on a button */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .interactive-element {
+            pointer-events: auto;
+        }
+
+        /* Cake Animation */
+        .cake-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-15px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .candle {
+            animation: flicker 1s infinite alternate;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.8; transform: scale(1); }
+            100% { opacity: 1; transform: scale(1.1); }
+        }
+
+        .pop-anim {
+            animation: popScale 0.2s ease-out;
+        }
+
+        @keyframes popScale {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-b from-sky-200 via-purple-100 to-pink-100 h-screen w-screen">
+
+    <!-- Canvas for Balloons and Confetti -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="ui-layer bg-white/30 backdrop-blur-sm interactive-element transition-opacity duration-500">
+        <div class="bg-white p-8 rounded-3xl shadow-2xl text-center max-w-md mx-4 border-4 border-pink-200">
+            <h1 class="text-4xl text-purple-600 mb-4 cursive-font font-bold">Hello Jyothi Mam!</h1>
+            <p class="text-gray-600 mb-6 text-lg">We have a surprise for you, but it's locked inside the balloons!</p>
+            <div class="mb-6 text-pink-500 text-xl font-bold">
+                <i class="fas fa-hand-pointer animate-bounce mr-2"></i> Pop 15 Balloons!
+            </div>
+            <button onclick="startGame()" class="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105 active:scale-95 text-xl">
+                Start Party
+            </button>
+        </div>
+    </div>
+
+    <!-- HUD (Heads Up Display) -->
+    <div id="hud" class="ui-layer justify-start items-start p-4 hidden">
+        <div class="bg-white/80 backdrop-blur rounded-full px-6 py-2 shadow-lg border-2 border-purple-300 interactive-element">
+            <span class="text-purple-600 font-bold text-xl">Wishes Collected: <span id="score">0</span>/15</span>
+        </div>
+    </div>
+
+    <!-- Win Screen -->
+    <div id="win-screen" class="ui-layer bg-black/40 backdrop-blur-sm hidden transition-opacity duration-1000">
+        <div class="bg-white p-8 rounded-3xl shadow-2xl text-center max-w-lg mx-4 border-4 border-yellow-300 relative overflow-hidden interactive-element cake-container">
+            <!-- Decorative Ribbon -->
+            <div class="absolute top-0 left-0 w-full h-4 bg-gradient-to-r from-pink-400 via-purple-400 to-yellow-400"></div>
+
+            <div class="text-6xl mb-4 candle">🎂</div>
+            
+            <h1 class="text-5xl text-pink-600 mb-2 cursive-font font-bold">Happy Birthday!</h1>
+            <h2 class="text-3xl text-purple-600 mb-6 cursive-font font-bold">Jyothi Mam</h2>
+            
+            <p class="text-gray-700 mb-6 text-lg leading-relaxed">
+                May your day be filled with as much joy, laughter, and happiness as you bring to everyone around you. Wishing you a fantastic year ahead!
+            </p>
+            
+            <button onclick="resetGame()" class="bg-yellow-400 hover:bg-yellow-500 text-white font-bold py-2 px-6 rounded-full shadow-md transform transition hover:scale-105">
+                Play Again
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('start-screen');
+        const hud = document.getElementById('hud');
+        const winScreen = document.getElementById('win-screen');
+        const scoreEl = document.getElementById('score');
+        
+        // Game State
+        let gameState = 'START'; // START, PLAYING, WON
+        let score = 0;
+        const targetScore = 15;
+        let balloons = [];
+        let particles = [];
+        let confetti = [];
+        let animationId;
+        
+        // Resize Canvas
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Colors
+        const colors = [
+            '#FFB7B2', '#FF9AA2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA', '#F6EAC2'
+        ];
+
+        // Utility
+        function randomRange(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        function randomColor() {
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        // Classes
+        class Balloon {
+            constructor() {
+                this.r = randomRange(30, 50);
+                this.x = randomRange(this.r, canvas.width - this.r);
+                this.y = canvas.height + this.r;
+                this.speed = randomRange(1.5, 3.5);
+                this.color = randomColor();
+                this.wobble = Math.random() * Math.PI * 2;
+                this.wobbleSpeed = randomRange(0.02, 0.05);
+                this.stringLen = this.r * 1.5;
+            }
+
+            update() {
+                this.y -= this.speed;
+                this.wobble += this.wobbleSpeed;
+                this.x += Math.sin(this.wobble) * 0.5;
+
+                // Reset if off screen top
+                if (this.y < -150) {
+                    this.y = canvas.height + 150;
+                    this.x = randomRange(30, canvas.width - 30);
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                
+                // String
+                ctx.beginPath();
+                ctx.moveTo(0, this.r);
+                ctx.quadraticCurveTo(
+                    Math.sin(this.wobble * 2) * 5, 
+                    this.r + this.stringLen / 2, 
+                    0, 
+                    this.r + this.stringLen
+                );
+                ctx.strokeStyle = '#888';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // Balloon Body
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                // Draw an oval shape
+                ctx.ellipse(0, 0, this.r, this.r * 1.2, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Shine
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.beginPath();
+                ctx.ellipse(-this.r * 0.3, -this.r * 0.3, this.r * 0.2, this.r * 0.4, -0.5, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Knot
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.moveTo(-5, this.r * 1.15);
+                ctx.lineTo(5, this.r * 1.15);
+                ctx.lineTo(0, this.r * 1.25);
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            isClicked(mx, my) {
+                const dist = Math.hypot(mx - this.x, my - this.y);
+                return dist < this.r * 1.2; // Slightly larger hit area
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.size = randomRange(2, 5);
+                this.speedX = randomRange(-3, 3);
+                this.speedY = randomRange(-3, 3);
+                this.life = 1.0;
+                this.decay = randomRange(0.02, 0.05);
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.life -= this.decay;
+                this.size *= 0.95;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = this.life;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        class ConfettiPiece {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height - canvas.height;
+                this.size = randomRange(5, 10);
+                this.speedY = randomRange(2, 5);
+                this.speedX = randomRange(-1, 1);
+                this.color = randomColor();
+                this.rotation = Math.random() * 360;
+                this.rotationSpeed = randomRange(-5, 5);
+            }
+
+            update() {
+                this.y += this.speedY;
+                this.x += Math.sin(this.y * 0.01) + this.speedX;
+                this.rotation += this.rotationSpeed;
+
+                if (this.y > canvas.height) {
+                    this.y = -20;
+                    this.x = Math.random() * canvas.width;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation * Math.PI / 180);
+                ctx.fillStyle = this.color;
+                ctx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size);
+                ctx.restore();
+            }
+        }
+
+        // Logic
+        function init() {
+            balloons = [];
+            for (let i = 0; i < 6; i++) {
+                balloons.push(new Balloon());
+                // Stagger starts
+                balloons[i].y = canvas.height + (i * 150);
+            }
+        }
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 15; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        function startGame() {
+            gameState = 'PLAYING';
+            score = 0;
+            scoreEl.innerText = score;
+            startScreen.style.opacity = '0';
+            setTimeout(() => {
+                startScreen.style.display = 'none';
+                hud.style.display = 'flex';
+            }, 500);
+            init();
+        }
+
+        function winGame() {
+            gameState = 'WON';
+            hud.style.display = 'none';
+            winScreen.style.display = 'flex';
+            winScreen.querySelector('.cake-container').style.display = 'flex'; // Ensure flex
+            
+            // Generate confetti
+            for (let i = 0; i < 150; i++) {
+                confetti.push(new ConfettiPiece());
+            }
+        }
+
+        function resetGame() {
+            winScreen.style.display = 'none';
+            hud.style.display = 'flex';
+            score = 0;
+            scoreEl.innerText = 0;
+            gameState = 'PLAYING';
+            balloons = [];
+            particles = [];
+            confetti = [];
+            init();
+        }
+
+        // Input Handling
+        function handleInput(e) {
+            if (gameState !== 'PLAYING') return;
+
+            const rect = canvas.getBoundingClientRect();
+            let clickX, clickY;
+
+            if (e.type.includes('touch')) {
+                clickX = e.touches[0].clientX - rect.left;
+                clickY = e.touches[0].clientY - rect.top;
+            } else {
+                clickX = e.clientX - rect.left;
+                clickY = e.clientY - rect.top;
+            }
+
+            for (let i = balloons.length - 1; i >= 0; i--) {
+                const b = balloons[i];
+                if (b.isClicked(clickX, clickY)) {
+                    // POP!
+                    createExplosion(b.x, b.y, b.color);
+                    
+                    // Respawn logic immediately for continuous flow or remove
+                    // For this game, let's recycle the balloon object
+                    b.y = canvas.height + 100; 
+                    b.x = randomRange(30, canvas.width - 30);
+                    b.color = randomColor();
+                    b.speed = randomRange(1.5, 3.5);
+
+                    score++;
+                    scoreEl.innerText = score;
+                    
+                    // Simple animation on score text
+                    scoreEl.parentElement.classList.add('pop-anim');
+                    setTimeout(() => scoreEl.parentElement.classList.remove('pop-anim'), 200);
+
+                    if (score >= targetScore) {
+                        winGame();
+                    }
+                    break; // Handle one click per frame/event
+                }
+            }
+        }
+
+        window.addEventListener('mousedown', handleInput);
+        window.addEventListener('touchstart', handleInput);
+
+        // Game Loop
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (gameState === 'PLAYING') {
+                // Update and draw balloons
+                balloons.forEach(b => {
+                    b.update();
+                    b.draw();
+                });
+            }
+
+            // Particles (Explosions)
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                particles[i].draw();
+                if (particles[i].life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            // Confetti (Win State)
+            if (gameState === 'WON') {
+                confetti.forEach(c => {
+                    c.update();
+                    c.draw();
+                });
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+    </script>
+</body>
+</html>
